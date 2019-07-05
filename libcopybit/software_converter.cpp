@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <string.h>
+
 #include "software_converter.h"
 
 /** Convert YV12 to YCrCb_420_SP */
