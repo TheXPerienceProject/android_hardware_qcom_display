@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright 2015 The Android Open Source Project
@@ -199,6 +199,7 @@ int HWCSession::Init() {
       CreateNullDisplay();
       null_display_active_ = true;
     }
+    hwc_display_[HWC_DISPLAY_PRIMARY]->SetIsPrimaryPanel(true);
   } else {
     // Create and power on primary display
     status = HWCDisplayPrimary::Create(core_intf_, &buffer_allocator_, &callbacks_, qservice_,
@@ -583,6 +584,7 @@ int32_t HWCSession::RegisterCallback(hwc2_device_t *device, int32_t descriptor,
     }
   }
   hwc_session->need_invalidate_ = false;
+  hwc_session->callback_reg_ = true;
   return INT32(error);
 }
 
@@ -1550,8 +1552,12 @@ void HWCSession::ResetPanel() {
 int HWCSession::HotPlugHandler(bool connected) {
   int status = 0;
   bool notify_hotplug = false;
-  if (!first_commit_ && !connected && hdmi_is_primary_) {
+  if (!first_commit_ && !connected && hdmi_is_primary_ && !null_display_active_) {
+    SCOPE_LOCK(locker_[HWC_DISPLAY_PRIMARY]);
     DLOGI("Disconnect event before first commit");
+    HWCDisplayExternal::Destroy(hwc_display_[HWC_DISPLAY_PRIMARY]);
+    CreateNullDisplay();
+    null_display_active_ = true;
     return 0;
   }
 
@@ -1721,13 +1727,6 @@ int HWCSession::CreateExternalDisplay(int disp, uint32_t primary_width,
     }
 }
 
-#ifdef DISPLAY_CONFIG_1_1
-// Methods from ::vendor::hardware::display::config::V1_1::IDisplayConfig follow.
-Return<int32_t> HWCSession::setDisplayAnimating(uint64_t display_id, bool animating ) {
-  return CallDisplayFunction(static_cast<hwc2_device_t *>(this), display_id,
-                             &HWCDisplay::SetDisplayAnimating, animating);
-}
-#endif
 
 void HWCSession::CreateNullDisplay() {
   auto hwc_display = &hwc_display_[HWC_DISPLAY_PRIMARY];
