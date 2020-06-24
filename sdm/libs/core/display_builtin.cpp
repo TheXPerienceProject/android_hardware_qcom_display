@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2019, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2020, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -54,6 +54,10 @@ DisplayBuiltIn::DisplayBuiltIn(int32_t display_id, DisplayEventHandler *event_ha
   : DisplayBase(display_id, kBuiltIn, event_handler, kDeviceBuiltIn, buffer_sync_handler,
                 buffer_allocator, comp_manager, hw_info_intf) {}
 
+DisplayBuiltIn::~DisplayBuiltIn() {
+  CloseFd(&previous_retire_fence_);
+}
+
 DisplayError DisplayBuiltIn::Init() {
   lock_guard<recursive_mutex> obj(recursive_mutex_);
   int32_t disable_defer_power_state = 0;
@@ -86,6 +90,7 @@ DisplayError DisplayBuiltIn::Init() {
   if (hw_panel_info_.mode == kModeCommand) {
     event_list_ = {HWEvent::VSYNC,
                    HWEvent::EXIT,
+                   HWEvent::IDLE_NOTIFY,
                    HWEvent::SHOW_BLANK_EVENT,
                    HWEvent::THERMAL_LEVEL,
                    HWEvent::IDLE_POWER_COLLAPSE,
@@ -204,6 +209,16 @@ DisplayError DisplayBuiltIn::Commit(LayerStack *layer_stack) {
     }
   }
 
+  if (vsync_enable_) {
+    DTRACE_BEGIN("RegisterVsync");
+    // wait for previous frame's retire fence to signal.
+    buffer_sync_handler_->SyncWait(previous_retire_fence_);
+
+    // Register for vsync and then commit the frame.
+    hw_events_intf_->SetEventState(HWEvent::VSYNC, true);
+    DTRACE_END();
+  }
+
   error = DisplayBase::Commit(layer_stack);
   if (error != kErrorNone) {
     return error;
@@ -240,6 +255,9 @@ DisplayError DisplayBuiltIn::Commit(LayerStack *layer_stack) {
   }
 
   first_cycle_ = false;
+
+  CloseFd(&previous_retire_fence_);
+  previous_retire_fence_ = Sys::dup_(layer_stack->retire_fence_fd);
 
   return error;
 }
@@ -298,6 +316,8 @@ DisplayError DisplayBuiltIn::SetDisplayMode(uint32_t mode) {
       return error;
     }
 
+    DisplayBase::ReconfigureDisplay();
+
     if (mode == kModeVideo) {
       ControlPartialUpdate(false /* enable */, &pending);
     } else if (mode == kModeCommand) {
@@ -314,9 +334,43 @@ DisplayError DisplayBuiltIn::SetDisplayMode(uint32_t mode) {
   return error;
 }
 
-DisplayError DisplayBuiltIn::SetPanelBrightness(int level) {
-  lock_guard<recursive_mutex> obj(recursive_mutex_);
-  return hw_intf_->SetPanelBrightness(level);
+DisplayError DisplayBuiltIn::SetPanelBrightness(float brightness) {
+  lock_guard<recursive_mutex> obj(brightness_lock_);
+
+  if (brightness != -1.0f && !(0.0f <= brightness && brightness <= 1.0f)) {
+    DLOGE("Bad brightness value = %f", brightness);
+    return kErrorParameters;
+  }
+
+  if (state_ == kStateOff) {
+    return kErrorNone;
+  }
+
+  // -1.0f = off, 0.0f = min, 1.0f = max
+  level_remainder_ = 0.0f;
+  int level = 0;
+  if (brightness == -1.0f) {
+    level = 0;
+  } else {
+    // Node only supports int level, so store the float remainder for accurate GetPanelBrightness
+    float max = hw_panel_info_.panel_max_brightness;
+    float min = hw_panel_info_.panel_min_brightness;
+    if (min >= max) {
+      DLOGE("Minimum brightness is greater than or equal to maximum brightness");
+      return kErrorDriverData;
+    }
+    float t = (brightness * (max - min)) + min;
+    level = static_cast<int>(t);
+    level_remainder_ = t - level;
+  }
+
+  DisplayError err = kErrorNone;
+  if ((err = hw_intf_->SetPanelBrightness(level)) == kErrorNone) {
+    DLOGI_IF(kTagDisplay, "Setting brightness to level %d (%f percent)", level,
+             brightness * 100);
+  }
+
+  return err;
 }
 
 DisplayError DisplayBuiltIn::GetRefreshRateRange(uint32_t *min_refresh_rate,
@@ -428,9 +482,32 @@ void DisplayBuiltIn::HwRecovery(const HWRecoveryEvent sdm_event_code) {
   DisplayBase::HwRecovery(sdm_event_code);
 }
 
-DisplayError DisplayBuiltIn::GetPanelBrightness(int *level) {
-  lock_guard<recursive_mutex> obj(recursive_mutex_);
-  return hw_intf_->GetPanelBrightness(level);
+DisplayError DisplayBuiltIn::GetPanelBrightness(float *brightness) {
+  lock_guard<recursive_mutex> obj(brightness_lock_);
+
+  DisplayError err = kErrorNone;
+  int level = 0;
+  if ((err = hw_intf_->GetPanelBrightness(&level)) != kErrorNone) {
+    return err;
+  }
+
+  // -1.0f = off, 0.0f = min, 1.0f = max
+  float max = hw_panel_info_.panel_max_brightness;
+  float min = hw_panel_info_.panel_min_brightness;
+  if (level == 0) {
+    *brightness = -1.0f;
+  } else if ((max > min) && (min <= level && level <= max)) {
+    *brightness = (static_cast<float>(level) + level_remainder_ - min) / (max - min);
+  } else {
+    min >= max ? DLOGE("Minimum brightness is greater than or equal to maximum brightness") :
+                 DLOGE("Invalid brightness level %d", level);
+    return kErrorDriverData;
+  }
+
+
+  DLOGI_IF(kTagDisplay, "Received level %d (%f percent)", level, *brightness * 100);
+
+  return kErrorNone;
 }
 
 DisplayError DisplayBuiltIn::ControlPartialUpdate(bool enable, uint32_t *pending) {
