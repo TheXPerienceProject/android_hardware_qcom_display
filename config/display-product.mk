@@ -12,6 +12,10 @@ PRODUCT_PACKAGES += \
     libsdmcore \
     libsdmutils \
     libqdMetaData \
+    libqdMetaData.system \
+    libdisplayconfig \
+    libgralloc.qti \
+    libdisplayconfig.qti \
     libdisplayconfig.vendor \
     libdisplayconfig.qti.vendor \
     vendor.display.config@1.0.vendor \
@@ -189,7 +193,7 @@ endif
 SOONG_CONFIG_NAMESPACES += qtidisplay
 
 # Soong Keys
-SOONG_CONFIG_qtidisplay := drmpp headless llvmsa gralloc4 gralloc_handle_has_no_reserved_size udfps default
+SOONG_CONFIG_qtidisplay := drmpp headless llvmsa gralloc4 gralloc_handle_has_no_reserved_size displayconfig_enabled udfps default
 
 # Soong Values
 SOONG_CONFIG_qtidisplay_drmpp := true
@@ -198,11 +202,16 @@ SOONG_CONFIG_qtidisplay_llvmsa := false
 SOONG_CONFIG_qtidisplay_gralloc4 := true
 
 SOONG_CONFIG_qtidisplay_gralloc_handle_has_no_reserved_size := false
+SOONG_CONFIG_qtidisplay_displayconfig_enabled := false
 SOONG_CONFIG_qtidisplay_udfps := false
 SOONG_CONFIG_qtidisplay_default := true
 
 ifeq ($(TARGET_GRALLOC_HANDLE_HAS_NO_RESERVED_SIZE),true)
     SOONG_CONFIG_qtidisplay_gralloc_handle_has_no_reserved_size := true
+endif
+
+ifeq ($(call is-vendor-board-platform,QCOM),true)
+    SOONG_CONFIG_qtidisplay_displayconfig_enabled := true
 endif
 
 ifeq ($(TARGET_IS_HEADLESS), true)
