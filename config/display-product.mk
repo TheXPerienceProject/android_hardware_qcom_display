@@ -87,7 +87,6 @@ PRODUCT_VENDOR_PROPERTIES += \
     debug.sf.hw=0 \
     debug.egl.hw=0 \
     debug.sf.latch_unsignaled=1 \
-    debug.sf.high_fps_late_app_phase_offset_ns=1000000 \
     debug.mdpcomp.logs=0 \
     vendor.gralloc.disable_ubwc=0 \
     vendor.display.disable_scaler=0 \
@@ -97,11 +96,17 @@ PRODUCT_VENDOR_PROPERTIES += \
     vendor.display.enable_optimize_refresh=1 \
     vendor.display.use_smooth_motion=1 \
     debug.sf.enable_advanced_sf_phase_offset=1 \
-    debug.sf.high_fps_late_sf_phase_offset_ns=-4000000 \
-    debug.sf.high_fps_early_phase_offset_ns=-4000000 \
-    debug.sf.high_fps_early_gl_phase_offset_ns=-4000000 \
     debug.sf.disable_client_composition_cache=1 \
     debug.sf.enable_gl_backpressure=1
+
+ifneq ($(TARGET_USES_CUSTOM_SF_OFFSETS),true)
+PRODUCT_VENDOR_PROPERTIES += \
+    debug.sf.high_fps_late_app_phase_offset_ns=1000000 \
+    debug.sf.high_fps_late_sf_phase_offset_ns=-4000000 \
+    debug.sf.high_fps_early_phase_offset_ns=-4000000 \
+    debug.sf.high_fps_early_gl_phase_offset_ns=-4000000
+endif
+$(warning "Display custom offsets= $(TARGET_USES_CUSTOM_SF_OFFSETS)")
 
 # Enable offline rotator for Bengal.
 ifneq ($(TARGET_BOARD_PLATFORM),bengal)
@@ -148,7 +153,9 @@ PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.use_color_management=tr
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.wcg_composition_dataspace=143261696
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.protected_contents=true
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.use_content_detection_for_refresh_rate=true
+ifneq ($(TARGET_USES_CUSTOM_SF_OFFSETS),true)
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.set_touch_timer_ms=200
+endif
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.force_hwc_copy_for_virtual_displays=true
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.max_frame_buffer_acquired_buffers=3
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.max_virtual_display_dimension=4096
