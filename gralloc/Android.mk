@@ -17,7 +17,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libqdMetaData libsync libgralloc
                                  android.hardware.graphics.mapper@2.1 \
                                  android.hardware.graphics.mapper@3.0 \
                                  android.hardware.graphics.mapper@4.0
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wall -Werror \
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wall -Werror -Wno-sign-conversion -Wno-shorten-64-to-32 \
                                  -D__QTI_DISPLAY_GRALLOC__
 LOCAL_CLANG                   := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
@@ -37,7 +37,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libqdMetaData libdl  \
                                   android.hardware.graphics.mapper@2.1 \
                                   android.hardware.graphics.mapper@3.0 \
                                   android.hardware.graphics.mapper@4.0
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion \
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion -Wno-shorten-64-to-32 \
                                  -D__QTI_DISPLAY_GRALLOC__
 
 ifeq ($(TARGET_USES_YCRCB_CAMERA_PREVIEW),true)
@@ -72,7 +72,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libqdMetaData libdl libgrallocut
                                   android.hardware.graphics.mapper@2.1 \
                                   android.hardware.graphics.mapper@3.0 \
                                   android.hardware.graphics.mapper@4.0
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion \
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion -Wno-shorten-64-to-32 \
                                  -D__QTI_DISPLAY_GRALLOC__
 ifeq ($(ENABLE_HYP),true)
 LOCAL_CFLAGS += -DHYPERVISOR
@@ -86,6 +86,7 @@ LOCAL_CFLAGS                  += -DGRALLOC_HANDLE_HAS_NO_RESERVED_SIZE
 endif
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := gr_allocator.cpp gr_buf_mgr.cpp gr_ion_alloc.cpp
+LOCAL_CFLAGS += -Wno-sign-conversion -Wno-shorten-64-to-32
 include $(BUILD_SHARED_LIBRARY)
 
 #mapper
@@ -108,7 +109,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) \
                                   android.hardware.graphics.mapper@2.1 \
                                   vendor.qti.hardware.display.mapperextensions@1.1 \
                                   android.hardware.graphics.mapper@3.0
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion \
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion -Wno-shorten-64-to-32 \
                                  -D__QTI_DISPLAY_GRALLOC__
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := QtiMapper.cpp QtiMapperExtensions.cpp
