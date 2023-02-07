@@ -97,7 +97,8 @@ PRODUCT_VENDOR_PROPERTIES += \
     vendor.display.use_smooth_motion=1 \
     debug.sf.enable_advanced_sf_phase_offset=1 \
     debug.sf.disable_client_composition_cache=1 \
-    debug.sf.enable_gl_backpressure=1
+    debug.sf.enable_gl_backpressure=1 \
+    debug.sf.predict_hwc_composition_strategy=0
 
 ifneq ($(TARGET_USES_CUSTOM_SF_OFFSETS),true)
 PRODUCT_VENDOR_PROPERTIES += \
