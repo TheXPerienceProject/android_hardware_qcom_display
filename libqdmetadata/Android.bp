@@ -1,8 +1,8 @@
 cc_library_shared {
     name: "libqdMetaData",
-    defaults: ["qtidisplay_common_defaults"],
-    vendor: true,
     defaults: ["qtidisplay_defaults"],
+    vendor: true,
+//    defaults: ["qtidisplay_defaults"],
     cflags: [
         "-Wno-sign-conversion",
         "-Wno-shorten-64-to-32",

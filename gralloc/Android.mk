@@ -61,7 +61,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libqdMetaData libdl libgrallocut
                                   android.hardware.graphics.mapper@2.1 \
                                   android.hardware.graphics.mapper@3.0 \
                                   android.hardware.graphics.mapper@4.0
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion \
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion -Wno-shorten-64-to-32 \
                                  -D__QTI_DISPLAY_GRALLOC__
 ifeq ($(ENABLE_HYP),true)
 LOCAL_CFLAGS += -DHYPERVISOR

@@ -4,6 +4,7 @@ cc_library_shared {
     vendor: true,
     cflags: [
         "-Wno-sign-conversion",
+        "-Wno-shorten-64-to-32",
         "-DLOG_TAG=\"qtigralloc\"",
     ],
     shared_libs: [
