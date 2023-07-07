@@ -162,7 +162,10 @@ PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.has_wide_color_display=
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.use_color_management=true
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.wcg_composition_dataspace=143261696
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.protected_contents=true
+ifneq ($(TARGET_DISABLE_DYNAMIC_RR), true)
+$(warning TARGET_DISABLE_DYNAMIC_RR: $(TARGET_DISABLE_DYNAMIC_RR))
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.use_content_detection_for_refresh_rate=true
+endif
 ifneq ($(TARGET_USES_CUSTOM_SF_OFFSETS),true)
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.surface_flinger.set_touch_timer_ms=200
 endif
