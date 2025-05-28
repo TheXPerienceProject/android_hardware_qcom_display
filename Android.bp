@@ -8,6 +8,7 @@ soong_config_module_type {
         "llvmsa",
         "gralloc4",
         "default",
+        "bitclk_rate_permissive",
         "var3",
         "llvmcov",
         "smmu_proxy",
@@ -155,6 +156,9 @@ qtidisplay_cc_defaults {
             conditions_default: {
                 enabled: true,
             },
+        },
+        bitclk_rate_permissive: {
+            cflags: ["-DBITCLK_RATE_PERMISSIVE"],
         },
     },
 }
