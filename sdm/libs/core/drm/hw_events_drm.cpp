@@ -47,6 +47,7 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <sched.h>
 #include <utility>
 #include <vector>
 #include <string>
