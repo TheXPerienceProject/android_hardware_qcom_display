@@ -43,6 +43,7 @@
 #include <dlfcn.h>
 #include <string>
 #include <utility>
+#include <mutex>
 #include <vector>
 
 #include "gr_utils.h"
@@ -57,12 +58,15 @@ namespace gralloc {
 DmaManager *DmaManager::dma_manager_ = NULL;
 
 DmaManager *DmaManager::GetInstance() {
-  if (!dma_manager_) {
+  static std::once_flag once;
+  std::call_once(once, []() {
     dma_manager_ = new DmaManager();
     dma_manager_->enable_logs_ = property_get_bool(ENABLE_LOGS_PROP, 0);
     dma_manager_->GetUncachedHeapUsage();
     dma_manager_->GetCameraPreviewPerms();
-  }
+    dma_manager_->GetSecurePreviewOnly();
+  });
+
   return dma_manager_;
 }
 
