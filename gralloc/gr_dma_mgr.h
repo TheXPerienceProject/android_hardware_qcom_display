@@ -41,6 +41,8 @@
 #include <string>
 #include <vector>
 #include <bitset>
+#include <mutex>
+#include <unordered_map>
 
 #include "gr_alloc_interface.h"
 #include "membuf_wrapper.h"
@@ -85,6 +87,15 @@ class DmaManager : public AllocInterface {
   void DeinitMemUtils();
   void Deinit();
 
+  std::once_flag mem_utils_once_;
+
+  std::unique_ptr<VmMem> vmmem_cached_;
+  bool vmmem_initialized_ = false;
+  std::unordered_map<std::string, VmHandle> vm_handle_cache_;
+
+  void InitVmMem();
+  VmHandle GetCachedVmHandle(const std::string &vm_name);
+
   int dma_dev_fd_ = FD_INIT;
   BufferAllocator buffer_allocator_;
   static DmaManager *dma_manager_;
@@ -103,8 +114,10 @@ class DmaManager : public AllocInterface {
   bool movable_heap_ubwcp_available_ = false;
   void GetUncachedHeapUsage();
   bool uncached_heap_prop_ = false;
+  void GetSecurePreviewOnly();
   void GetCameraPreviewPerms();
   bool allow_camera_preview_write_ = false;
+  int secure_preview_only_ = 0;
 
   void* libvmmemPointer;
   std::unique_ptr<VmMem> (*createVmMem)();

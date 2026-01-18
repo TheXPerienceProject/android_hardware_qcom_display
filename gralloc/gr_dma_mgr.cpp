@@ -43,6 +43,7 @@
 #include <dlfcn.h>
 #include <string>
 #include <utility>
+#include <mutex>
 #include <vector>
 
 #include "gr_utils.h"
@@ -74,38 +75,44 @@ DmaManager::DmaManager() {
 }
 
 DmaManager *DmaManager::GetInstance() {
-  if (!dma_manager_) {
+  static std::once_flag once;
+  std::call_once(once, []() {
     dma_manager_ = new DmaManager();
     dma_manager_->enable_logs_ = property_get_bool(ENABLE_LOGS_PROP, 0);
     dma_manager_->GetUncachedHeapUsage();
     dma_manager_->GetCameraPreviewPerms();
-  }
+    dma_manager_->GetSecurePreviewOnly();
+  });
+
   return dma_manager_;
 }
 
 void DmaManager::InitMemUtils() {
-  if (mem_utils_lib_) {
-    return;
-  }
-  mem_utils_lib_ = ::dlopen(MEMBUF_CLIENT_LIB_NAME, RTLD_NOW);
-  if (mem_utils_lib_) {
-    CreateMemBuf_ = reinterpret_cast<CreateMemBufInterface>(::dlsym(mem_utils_lib_,
-                                                            CREATE_MEMBUF_INTERFACE_NAME));
-    DestroyMemBuf_ = reinterpret_cast<DestroyMemBufInterface>(::dlsym(mem_utils_lib_,
-                                                             DESTROY_MEMBUF_INTERFACE_NAME));
-    if (!CreateMemBuf_ || !DestroyMemBuf_) {
-      ALOGW("Membuf Symbols not resolved");
+  std::call_once(mem_utils_once_, [this]() {
+    if (mem_utils_lib_) {
       return;
     }
-  } else {
-    ALOGW("Unable to load = %s, error = %s", MEMBUF_CLIENT_LIB_NAME, ::dlerror());
-    return;
-  }
-  int err = CreateMemBuf_(&mem_buf_);
-  if (err != 0) {
-    ALOGW("GetMemBuf failed!! %d", err);
-    return;
-  }
+    mem_utils_lib_ = ::dlopen(MEMBUF_CLIENT_LIB_NAME, RTLD_NOW);
+    if (mem_utils_lib_) {
+      CreateMemBuf_ = reinterpret_cast<CreateMemBufInterface>(::dlsym(mem_utils_lib_,
+                                                              CREATE_MEMBUF_INTERFACE_NAME));
+      DestroyMemBuf_ = reinterpret_cast<DestroyMemBufInterface>(::dlsym(mem_utils_lib_,
+                                                               DESTROY_MEMBUF_INTERFACE_NAME));
+      if (!CreateMemBuf_ || !DestroyMemBuf_) {
+        ALOGW("Membuf Symbols not resolved");
+        return;
+      }
+    } else {
+      ALOGW("Unable to load = %s, error = %s", MEMBUF_CLIENT_LIB_NAME, ::dlerror());
+      return;
+    }
+    int err = CreateMemBuf_(&mem_buf_);
+    if (err != 0) {
+      ALOGW("GetMemBuf failed!! %d", err);
+      mem_buf_ = nullptr;
+      return;
+    }
+  });
 
   // check heap availability
   auto heap_list = buffer_allocator_.GetDmabufHeapList();
@@ -139,11 +146,6 @@ void DmaManager::Deinit() {
 int DmaManager::AllocBuffer(AllocData *data) {
   ATRACE_CALL();
   unsigned int flags = data->flags;
-
-  std::string tag_name{};
-  if (ATRACE_ENABLED()) {
-    tag_name = "libdma alloc size: " + std::to_string(data->size);
-  }
 
   ATRACE_BEGIN("GrallocAllocation");
   dma_dev_fd_ = buffer_allocator_.Alloc(data->heap_name, data->size, flags, data->align);
@@ -242,16 +244,54 @@ int DmaManager::UnmapBuffer(void *base, unsigned int size, unsigned int /*offset
   return err;
 }
 
+void DmaManager::InitVmMem() {
+  if (vmmem_initialized_) {
+    return;
+  }
+
+  if (!createVmMem) {
+    vmmem_initialized_ = true;
+    return;
+  }
+
+  vmmem_cached_ = createVmMem();
+  if (!vmmem_cached_) {
+    vmmem_initialized_ = true;
+    return;
+  }
+
+  static const char *kVmNames[] = {
+      "qcom,cp_sec_display",
+      "qcom,cp_camera_preview",
+      "qcom,cp_camera",
+      "qcom,cp_cdsp",
+  };
+  for (const char *name : kVmNames) {
+    VmHandle handle = vmmem_cached_->FindVmByName(name);
+    vm_handle_cache_.emplace(name, handle);
+  }
+
+  vmmem_initialized_ = true;
+}
+
+VmHandle DmaManager::GetCachedVmHandle(const std::string &vm_name) {
+  auto it = vm_handle_cache_.find(vm_name);
+  if (it != vm_handle_cache_.end()) {
+    return it->second;
+  }
+  return vmmem_cached_ ? vmmem_cached_->FindVmByName(vm_name) : VmHandle{};
+}
+
 int DmaManager::SecureMemPerms(AllocData *data) {
   int ret = 0;
-  std::unique_ptr<VmMem> vmmem = createVmMem();
-  if (!vmmem) {
+  InitVmMem();
+  if (!vmmem_cached_) {
     return -ENOMEM;
   }
   VmPerm vm_perms;
 
   for (auto vm_name : data->vm_names) {
-    VmHandle handle = vmmem->FindVmByName(vm_name);
+    VmHandle handle = GetCachedVmHandle(vm_name);
     if (vm_name == "qcom,cp_sec_display") {
       vm_perms.push_back(std::make_pair(handle, VMMEM_READ));
     } else if (vm_name == "qcom,cp_camera_preview") {
@@ -267,7 +307,7 @@ int DmaManager::SecureMemPerms(AllocData *data) {
     }
   }
 
-  ret = vmmem->LendDmabuf(data->fd, vm_perms);
+  ret = vmmem_cached_->LendDmabuf(data->fd, vm_perms);
   return ret;
 }
 
@@ -307,6 +347,12 @@ void DmaManager::GetHeapInfo(uint64_t usage, bool sensor_flag, int format, bool 
                              unsigned int *alloc_size) {
   // Query Camera Security Framework in order to allocate from legacy/non-legacy heap
   GetCSFVersion();
+
+  if (dma_vm_names) {
+    dma_vm_names->clear();
+    dma_vm_names->reserve(3);
+  }
+
   std::string heap_name = "qcom,system";
 
   if (uncached_heap_prop_ && use_uncached) {
@@ -316,13 +362,8 @@ void DmaManager::GetHeapInfo(uint64_t usage, bool sensor_flag, int format, bool 
   if (usage & GRALLOC_USAGE_PROTECTED) {
     if (usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
       heap_name = "qcom,display";
-      dma_vm_names->push_back("qcom,cp_sec_display");
+      dma_vm_names->emplace_back("qcom,cp_sec_display");
     } else if (usage & BufferUsage::CAMERA_OUTPUT) {
-      int secure_preview_only = 0;
-      char property[PROPERTY_VALUE_MAX];
-      if (property_get(SECURE_PREVIEW_ONLY_PROP, property, NULL) > 0) {
-        secure_preview_only = atoi(property);
-      }
       // CSF 2.5 version and up
       if (CSFEnabled()) {
         heap_name = "qcom,system";
@@ -331,19 +372,19 @@ void DmaManager::GetHeapInfo(uint64_t usage, bool sensor_flag, int format, bool 
         heap_name = "qcom,display";
       }
       if (usage & GRALLOC_USAGE_PRIVATE_CDSP) {
-        dma_vm_names->push_back("qcom,cp_cdsp");
+        dma_vm_names->emplace_back("qcom,cp_cdsp");
       }
       // Below CSF 2.5
       if (!CSFEnabled()) {
         if ((usage & BufferUsage::COMPOSER_OVERLAY)) {
-          if (secure_preview_only) {
-            dma_vm_names->push_back("qcom,cp_camera_preview");
+          if (secure_preview_only_) {
+            dma_vm_names->emplace_back("qcom,cp_camera_preview");
           } else {
-            dma_vm_names->push_back("qcom,cp_camera");
-            dma_vm_names->push_back("qcom,cp_camera_preview");
+            dma_vm_names->emplace_back("qcom,cp_camera");
+            dma_vm_names->emplace_back("qcom,cp_camera_preview");
           }
         } else {
-          dma_vm_names->push_back("qcom,cp_camera");
+          dma_vm_names->emplace_back("qcom,cp_camera");
         }
       }
     } else if (usage & GRALLOC_USAGE_PRIVATE_CDSP) {
@@ -376,9 +417,10 @@ void DmaManager::GetHeapInfo(uint64_t usage, bool sensor_flag, int format, bool 
     }
   }
 
-  if (IsUBwcPEnabled(format, usage)) {
+  const bool ubwcp_enabled = IsUBwcPEnabled(format, usage);
+  if (ubwcp_enabled) {
     heap_name = "qcom,ubwcp";
-    ALOGI("UBWCP enabled:%d heap_name:%s", IsUBwcPEnabled(format, usage), heap_name.c_str());
+    ALOGI("UBWCP enabled:%d heap_name:%s", ubwcp_enabled, heap_name.c_str());
   }
 
   *alloc_type = type;
@@ -451,6 +493,15 @@ void DmaManager::GetUncachedHeapUsage() {
   }
   uncached_heap_prop_ = false;
   return;
+}
+
+void DmaManager::GetSecurePreviewOnly() {
+  char property[PROPERTY_VALUE_MAX];
+  if (property_get(SECURE_PREVIEW_ONLY_PROP, property, NULL) > 0) {
+    secure_preview_only_ = atoi(property);
+    return;
+  }
+  secure_preview_only_ = 0;
 }
 
 void DmaManager::GetCameraPreviewPerms() {
