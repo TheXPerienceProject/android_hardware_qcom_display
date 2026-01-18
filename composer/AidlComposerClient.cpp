@@ -1596,6 +1596,18 @@ SpAIBinder AidlComposerClient::createBinder() {
   return binder;
 }
 
+::ndk::ScopedAStatus AidlComposerClient::getMaxLayerPictureProfiles(int64_t /*in_display*/, int32_t* _aidl_return) {
+  *_aidl_return = 0;
+  return ::ndk::ScopedAStatus::ok();
+}
+
+::ndk::ScopedAStatus AidlComposerClient::startHdcpNegotiation(int64_t /*in_display*/, const ::aidl::android::hardware::drm::HdcpLevels& /*in_levels*/) {
+  return ::ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+::ndk::ScopedAStatus AidlComposerClient::getLuts(int64_t /*in_display*/, const std::vector<::aidl::android::hardware::graphics::composer3::Buffer>& /*in_buffers*/, std::vector<::aidl::android::hardware::graphics::composer3::Luts>* /*_aidl_return*/) {
+  return ::ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
 }  // namespace composer3
 }  // namespace display
 }  // namespace hardware

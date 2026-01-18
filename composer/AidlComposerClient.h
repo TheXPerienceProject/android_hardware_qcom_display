@@ -204,6 +204,9 @@ class AidlComposerClient : public BnComposerClient {
   ScopedAStatus setReadbackBuffer(int64_t in_display, const NativeHandle &in_buffer,
                                   const ::ndk::ScopedFileDescriptor &in_release_fence) override;
   ScopedAStatus setVsyncEnabled(int64_t in_display, bool in_enabled) override;
+  ScopedAStatus getMaxLayerPictureProfiles(int64_t in_display, int32_t* _aidl_return) override;
+  ScopedAStatus startHdcpNegotiation(int64_t in_display, const ::aidl::android::hardware::drm::HdcpLevels& in_levels) override;
+  ScopedAStatus getLuts(int64_t in_display, const std::vector<::aidl::android::hardware::graphics::composer3::Buffer>& in_buffers, std::vector<::aidl::android::hardware::graphics::composer3::Luts>* _aidl_return) override;
   ScopedAStatus setIdleTimerEnabled(int64_t in_display, int32_t in_timeout_ms) override;
   ScopedAStatus getHdrConversionCapabilities(
       std::vector<HdrConversionCapability> *_aidl_return) override;
