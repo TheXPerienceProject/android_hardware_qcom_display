@@ -19,7 +19,7 @@ cc_library_shared {
     ] + select(soong_config_variable("qtidisplay", "legacy_pphwresourceinfo"), {
         true: ["-DTARGET_EXCLUDE_DDR_INFO"],
         default: [],
-    })  + select(soong_config_variable("qtidisplay", "sm8650_pxlw_vendor_namespace"), {
+    }) + select(soong_config_variable("qtidisplay", "sm8650_pxlw_vendor_namespace"), {
         any @ value: [
             "-DSUPPORTS_PXLW",
         ],
