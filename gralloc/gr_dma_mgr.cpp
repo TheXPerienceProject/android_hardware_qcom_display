@@ -229,7 +229,7 @@ int DmaManager::UnmapBuffer(void *base, unsigned int size, unsigned int /*offset
 
 int DmaManager::SecureMemPerms(AllocData *data) {
   int ret = 0;
-  std::unique_ptr<VmMem> vmmem = createVmMem();
+  std::unique_ptr<VmMem> vmmem = VmMem::CreateVmMem();
   if (!vmmem) {
     return -ENOMEM;
   }

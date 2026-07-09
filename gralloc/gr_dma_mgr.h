@@ -108,8 +108,6 @@ class DmaManager : public AllocInterface {
   bool allow_camera_preview_write_ = false;
   int secure_preview_only_ = 0;
 
-  void* libvmmemPointer;
-  std::unique_ptr<VmMem> (*createVmMem)();
 };
 
 }  // namespace gralloc
