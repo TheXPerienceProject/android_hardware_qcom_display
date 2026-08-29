@@ -36,7 +36,6 @@
 #include <utils/String16.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
-#include <QService.h>
 #include <utils/utils.h>
 #include <algorithm>
 #include <utility>
@@ -483,6 +482,10 @@ void HWCSession::InitSupportedDisplaySlots() {
           INT32(start_index));
     map_hwc_display_.insert(std::make_pair(map.client_id, start_index++));
   }
+}
+
+bool HWCSession::IsPluggablePrimary() const {
+  return pluggable_is_primary_;
 }
 
 int HWCSession::GetDisplayIndex(int dpy) {
